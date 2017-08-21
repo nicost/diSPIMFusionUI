@@ -1,11 +1,18 @@
 
 package edu.ucsf.valelab.dispimfusionui;
 
-import java.io.File;
-import org.scijava.command.Command;
-import org.scijava.plugin.Parameter;
-import org.scijava.plugin.Plugin;
-import org.scijava.widget.FileWidget;
+import ij.io.DirectoryChooser;
+import ij.io.OpenDialog;
+import ij.plugin.PlugIn;
+import java.awt.Label;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JTextField;
+
+
+import net.miginfocom.swing.MigLayout;
 
 
 
@@ -13,21 +20,57 @@ import org.scijava.widget.FileWidget;
  *
  * @author nico
  */
-@Plugin(type = Command.class, menuPath = "Plugins>diSpimFusion") 
-public class DiSpim_Fusion implements Command {
 
-   @Parameter (style = FileWidget.DIRECTORY_STYLE, label = "SPIMA Directory")
-   private File spimADirectory_;
+public class DiSpim_Fusion implements PlugIn {
+   private final JTextField spimADirectory_;
+   private final JTextField spimBDirectory_;
    
-   @Parameter (style = FileWidget.DIRECTORY_STYLE, label = "SPIMB Directory")
-   private File spimBDirectory_;
-   
-   public void run() {
+   public DiSpim_Fusion () {
+      
+      spimADirectory_ = new JTextField();
+      spimBDirectory_ = new JTextField();
+      
    }
-         
+           
 
-
-
-
+   @Override
+   public void run(String string) {
+      // create the dialog
+      
+      int xPos = 100;
+      int yPos = 100;
+      int width = 400;
+      int height = 300;
+      JFrame frame = new JFrame ();
+      frame.setBounds(xPos, yPos, width, height);
+      frame.setLayout( new MigLayout());
+      
+      frame.add(new Label("SPIMA Directory"));
+      frame.add(spimADirectory_);
+      frame.add(chooserButton("SPIM A Directory", spimADirectory_, true));
+      
+      
+              
+   }
    
+   public JButton chooserButton(final String msg, final JTextField pathField, final boolean dir) {
+      JButton button = new JButton("...");
+      button.addActionListener(new ActionListener() {
+         @Override
+         public void actionPerformed(ActionEvent e) {
+            if (dir) {
+               DirectoryChooser dc = new DirectoryChooser(msg);
+               pathField.setText(dc.getDirectory());
+            }
+            else {
+               OpenDialog od = new OpenDialog(msg);
+               pathField.setText(od.getPath());
+            }
+         }
+      });
+      
+      return button;
+   }
+
+ 
 }

@@ -2,12 +2,6 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-     <groupId>org.scijava</groupId>
-     <artifactId>pom-scijava</artifactId>
-     <version>16.2.0</version>
-     <relativePath />
-  </parent>
 
   <groupId>edu.ucsf.valelab.dispimfusionui</groupId>
   <artifactId>diSPIMFusionUI</artifactId>
@@ -19,6 +13,8 @@
   <description>Interface to the Cuda Fusion code of Min Lei.  Images need to be stored on disk in a compatible format. </description>
   <properties>
      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+     <license.licenseName>Why again? Stll ask the tech transfer guys</license.licenseName>
+		<license.copyrightOwners>we'll see</license.copyrightOwners>
   </properties>
 
   <build>
@@ -45,18 +41,29 @@
   </repositories>
 
   <dependencies>
+     
+     <dependency>
+        <groupId>com.miglayout</groupId>
+        <artifactId>miglayout</artifactId>
+        <version>3.7.4</version>
+     </dependency>
 
-    <dependency>
+     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <version>4.12</version>
       <scope>test</scope>
     </dependency>
 
     <dependency>
        <groupId>net.imagej</groupId>
-       <artifactId>imagej</artifactId>
+       <artifactId>ij</artifactId>
+       <version>1.51p</version>
     </dependency>
 
   </dependencies>
+  
+
+   
 
 </project>

@@ -4,7 +4,7 @@
 
 
   <groupId>edu.ucsf.valelab.dispimfusionui</groupId>
-  <artifactId>diSPIMFusionUI</artifactId>
+  <artifactId>diSPIM_FusionUI</artifactId>
   <packaging>jar</packaging>
   <version>0.1</version>
 
@@ -13,8 +13,6 @@
   <description>Interface to the Cuda Fusion code of Min Lei.  Images need to be stored on disk in a compatible format. </description>
   <properties>
      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-     <license.licenseName>Why again? Stll ask the tech transfer guys</license.licenseName>
-		<license.copyrightOwners>we'll see</license.copyrightOwners>
   </properties>
 
   <build>

@@ -10,8 +10,10 @@ import ij.plugin.frame.Recorder;
 import java.awt.Label;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -331,12 +333,21 @@ public class DiSpimFusion implements PlugIn {
       frame.add(intSpinners_.get(GPUDEVICE), spinnerWidth_ + ", " + paragraphSpacing_);
       
       JButton okButton = new JButton("OK");
-      okButton.addActionListener(new ActionListener(){
+      okButton.addActionListener(new ActionListener() {
          @Override
          public void actionPerformed(ActionEvent e) {
             storeSettings();
             frame.setVisible(false);
-            // TODO: do the real work
+            frame.dispose();
+
+            Runnable executor = new Runnable() {
+               @Override
+               public void run() {
+                  execute();
+               }
+            };
+            (new Thread(executor, "diSPIM CUDA execution")).start();
+            
          }
       });
       frame.add(okButton, "span 4, split 4, tag ok");
@@ -346,6 +357,7 @@ public class DiSpimFusion implements PlugIn {
          @Override
          public void actionPerformed(ActionEvent e) {
             frame.setVisible(false);
+            frame.dispose();
          }
       });
       frame.add(cancelButton, "tag cancel, wrap");
@@ -486,15 +498,30 @@ public class DiSpimFusion implements PlugIn {
       command.add(String.valueOf(prefs_.getInt(OUTPUTBITS, 16)));
       command.add(prefs_.get(PSFA, " "));
       command.add(prefs_.get(PSFB, " "));
-      // GPUU stuff
-      
-      
-      
+      // GPU stuff
+      command.add(prefs_.getBoolean(SHOWGPUINFO, true) ? "1" : "0");
+      command.add(String.valueOf(prefs_.getInt(GPUDEVICE, 0)));
+              
       ProcessBuilder cmd = new ProcessBuilder(command);
       cmd.directory(cudaExe_.getParentFile());
       try {
-         Process process = cmd.start();
+         Process process = cmd.start();  // actually start execution
+         BufferedReader reader = 
+                new BufferedReader(new InputStreamReader(process.getInputStream()));
+         // StringBuilder sb = new StringBuilder();
+         String line;
+         while ( (line = reader.readLine()) != null) {
+            ij.IJ.log(line);
+            //sb.append(line);
+            //sb.append(System.getProperty("line.separator"));
+         }
+         //String output = sb.toString();
+         
          int result = process.waitFor();
+         if (result != 0) {
+            // return error to user:
+            ij.IJ.log("diSPIM Cuda execution failed with error code: " + result);
+         }
       } catch (IOException ex) {}
       catch (InterruptedException ex) {}
    }

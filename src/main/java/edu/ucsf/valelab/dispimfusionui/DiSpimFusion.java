@@ -472,6 +472,7 @@ public class DiSpimFusion implements PlugIn {
       command.add(String.valueOf(prefs_.getInt(START, 0)));
       command.add(String.valueOf(prefs_.getInt(END, 1)));
       command.add(String.valueOf(prefs_.getInt(INTERVAL, 1)));
+      command.add(String.valueOf(prefs_.getDouble(TEST, 1)));
       command.add(String.valueOf(prefs_.getDouble(XPIXELSIZEA, 0.165)));
       command.add(String.valueOf(prefs_.getDouble(YPIXELSIZEA, 0.165)));
       command.add(String.valueOf(prefs_.getDouble(ZPIXELSIZEA, 1.0)));
@@ -491,6 +492,7 @@ public class DiSpimFusion implements PlugIn {
          // TODO: path to transformation matrix
       }
       command.add(reg2D ? "1" : "0");
+      command.add(useInputMatrix ? "1" : "0");
       command.add("Balabalabala"); // path to transformation matrix
       command.add(prefs_.getBoolean(SAVEREGISTEREDIMAGES, false) ? "1" : "0");
       command.add(String.valueOf(prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
@@ -501,6 +503,12 @@ public class DiSpimFusion implements PlugIn {
       // GPU stuff
       command.add(prefs_.getBoolean(SHOWGPUINFO, true) ? "1" : "0");
       command.add(String.valueOf(prefs_.getInt(GPUDEVICE, 0)));
+      
+      for (String token : command) {
+         ij.IJ.log(token);
+      }
+      int nrArgs = command.size() - 1;
+      ij.IJ.log ("There are: " + nrArgs + " arguments");
               
       ProcessBuilder cmd = new ProcessBuilder(command);
       cmd.directory(cudaExe_.getParentFile());

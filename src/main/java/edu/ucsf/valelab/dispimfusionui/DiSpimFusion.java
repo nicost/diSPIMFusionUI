@@ -1,6 +1,7 @@
 
 package edu.ucsf.valelab.dispimfusionui;
 
+import ij.IJ;
 import ij.Macro;
 import ij.io.DirectoryChooser;
 import ij.io.OpenDialog;
@@ -9,7 +10,12 @@ import ij.plugin.frame.Recorder;
 import java.awt.Label;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.prefs.Preferences;
 import javax.swing.JButton;
@@ -86,8 +92,6 @@ public class DiSpimFusion implements PlugIn {
          "90 deg (Y-axis)",
          "-90 deg (Y-axis)" };
    
-   private boolean recorderOn_ = false;
-   
    private final String[] textFields_ = {
          SPIMADIRECTORY, SPIMBDIRECTORY, IMAGEANAME,  IMAGEBNAME, 
          OUTPUTDIRECTORY, PSFA, PSFB };
@@ -112,6 +116,9 @@ public class DiSpimFusion implements PlugIn {
       SAVEREGISTEREDIMAGES, SHOWGPUINFO };
    private final Map<String, JCheckBox> checkBoxes_ = 
            new HashMap<String, JCheckBox>(checkBoxLabels_.length);
+   
+   private boolean recorderOn_ = false;
+   private File cudaExe_ = null;
    
    public DiSpimFusion () {
       
@@ -154,15 +161,31 @@ public class DiSpimFusion implements PlugIn {
 
    @Override
    public void run(String string) {
-      // create the dialog
       
+      if (!IJ.isWindows()) {
+         IJ.showMessage("Sorry, this code currently only works on Windows");
+         return;
+      }
+      
+      String imageJDir = IJ.getDirectory("imagej");
+      File cudaDir = new File(imageJDir + File.separator + "CudaApp");
+      if (cudaDir.exists()) {
+         cudaExe_ = new File (cudaDir.getPath() + File.separator + 
+                 "spimfusion_singlecolor.exe");  
+      }
+      if (cudaExe_ == null || !cudaExe_.canExecute()) {
+            IJ.showMessage("Please copy the CudaApp directory into the ImageJ directory");
+            return;
+      }
+
       recorderOn_ = Recorder.record;
       
       String optionsString = Macro.getOptions();
       if (optionsString == null) {
          optionsString = "";
       }
-      
+
+      // create the dialog
       int xPos = 100;
       int yPos = 100;
       int width = 400;
@@ -424,6 +447,56 @@ public class DiSpimFusion implements PlugIn {
       if (recorderOn_) {
          Recorder.saveCommand();
       }
+   }
+   
+   private void execute() {
+      List<String> command = new ArrayList<String>();
+      command.add(cudaExe_.getAbsolutePath());
+      command.add(prefs_.get(SPIMADIRECTORY, " "));
+      command.add(prefs_.get(SPIMBDIRECTORY, " "));
+      command.add(prefs_.get(IMAGEANAME, " "));
+      command.add(prefs_.get(IMAGEBNAME, " "));
+      command.add(prefs_.get(OUTPUTDIRECTORY, " "));
+      command.add(String.valueOf(prefs_.getInt(START, 0)));
+      command.add(String.valueOf(prefs_.getInt(END, 1)));
+      command.add(String.valueOf(prefs_.getInt(INTERVAL, 1)));
+      command.add(String.valueOf(prefs_.getDouble(XPIXELSIZEA, 0.165)));
+      command.add(String.valueOf(prefs_.getDouble(YPIXELSIZEA, 0.165)));
+      command.add(String.valueOf(prefs_.getDouble(ZPIXELSIZEA, 1.0)));
+      command.add(String.valueOf(prefs_.getDouble(XPIXELSIZEB, 0.165)));
+      command.add(String.valueOf(prefs_.getDouble(YPIXELSIZEB, 0.165)));
+      command.add(String.valueOf(prefs_.getDouble(ZPIXELSIZEB, 1.0)));
+      command.add(String.valueOf(Arrays.asList(regOptionsStr_).indexOf(
+              prefs_.get(REGISTRATIONOPTIONS, "All images dependently"))));
+      int imbRotation = Arrays.asList(imageBRotationsStr_).indexOf(
+              prefs_.get(IMAGEBROTATION, "No Rotation"));
+      if (imbRotation == 2) { imbRotation = -1;}
+      command.add(String.valueOf(imbRotation));
+      boolean reg2D = prefs_.getBoolean(DO2DREGISTRATION, false);
+      boolean useInputMatrix = prefs_.getBoolean(CUSTOMIZEMATRIX, false);
+      if (useInputMatrix) {
+         reg2D = false;
+         // TODO: path to transformation matrix
+      }
+      command.add(reg2D ? "1" : "0");
+      command.add("Balabalabala"); // path to transformation matrix
+      command.add(prefs_.getBoolean(SAVEREGISTEREDIMAGES, false) ? "1" : "0");
+      command.add(String.valueOf(prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
+      command.add (String.valueOf(prefs_.getInt(DECONVOLUTIONITERATIONS, 10)));
+      command.add(String.valueOf(prefs_.getInt(OUTPUTBITS, 16)));
+      command.add(prefs_.get(PSFA, " "));
+      command.add(prefs_.get(PSFB, " "));
+      // GPUU stuff
+      
+      
+      
+      ProcessBuilder cmd = new ProcessBuilder(command);
+      cmd.directory(cudaExe_.getParentFile());
+      try {
+         Process process = cmd.start();
+         int result = process.waitFor();
+      } catch (IOException ex) {}
+      catch (InterruptedException ex) {}
    }
    
 }

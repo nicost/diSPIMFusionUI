@@ -188,6 +188,7 @@ public class DiSpimFusion implements PlugIn {
       }
 
       // create the dialog
+      // TODO: remember window position and size in preferences
       int xPos = 100;
       int yPos = 100;
       int width = 400;
@@ -504,26 +505,26 @@ public class DiSpimFusion implements PlugIn {
       command.add(prefs_.getBoolean(SHOWGPUINFO, true) ? "1" : "0");
       command.add(String.valueOf(prefs_.getInt(GPUDEVICE, 0)));
       
-      for (String token : command) {
-         ij.IJ.log(token);
-      }
+      //for (String token : command) {
+      //   ij.IJ.log(token);
+      //}
       int nrArgs = command.size() - 1;
       ij.IJ.log ("There are: " + nrArgs + " arguments");
               
       ProcessBuilder cmd = new ProcessBuilder(command);
       cmd.directory(cudaExe_.getParentFile());
       try {
-         Process process = cmd.start();  // actually start execution
+         // actually start execution
+         Process process = cmd.start(); 
+         
+         // show output in IJ.log window
          BufferedReader reader = 
                 new BufferedReader(new InputStreamReader(process.getInputStream()));
-         // StringBuilder sb = new StringBuilder();
-         String line;
-         while ( (line = reader.readLine()) != null) {
+         String line = reader.readLine();
+         while ( line != null) {
             ij.IJ.log(line);
-            //sb.append(line);
-            //sb.append(System.getProperty("line.separator"));
+            line = reader.readLine();
          }
-         //String output = sb.toString();
          
          int result = process.waitFor();
          if (result != 0) {

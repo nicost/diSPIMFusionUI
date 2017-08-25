@@ -3,10 +3,10 @@ package edu.ucsf.valelab.dispimfusionui;
 
 import ij.IJ;
 import ij.Macro;
-import ij.io.DirectoryChooser;
 import ij.io.OpenDialog;
 import ij.plugin.PlugIn;
 import ij.plugin.frame.Recorder;
+import java.awt.EventQueue;
 import java.awt.Label;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -16,19 +16,25 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.prefs.Preferences;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingUtilities;
 
 
 import net.miginfocom.swing.MigLayout;
@@ -83,7 +89,8 @@ public class DiSpimFusion implements PlugIn {
    private final String paragraphSpacing_ = "wrap 15px";
    private final String spinnerWidth_ = "w 60:60:60";
    
-   final private Preferences prefs_;
+   private final Preferences prefs_;
+   private final DecimalFormat df_;
 
    private final JComboBox registrationOptions_;
    private final String[] regOptionsStr_ = {
@@ -132,6 +139,9 @@ public class DiSpimFusion implements PlugIn {
    public DiSpimFusion () {
       
       prefs_ = Preferences.userNodeForPackage(this.getClass());
+      
+      df_ = new DecimalFormat("0", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
+      df_.setMaximumFractionDigits(12); 
       
       for (String jt : textFields_) {
          jTextFields_.put(jt, new JTextField());
@@ -383,13 +393,53 @@ public class DiSpimFusion implements PlugIn {
       button.addActionListener(new ActionListener() {
          @Override
          public void actionPerformed(ActionEvent e) {
-            if (dir) {
-               DirectoryChooser dc = new DirectoryChooser(msg);
-               pathField.setText(dc.getDirectory());
-            }
-            else {
-               OpenDialog od = new OpenDialog(msg);
-               pathField.setText(od.getPath());
+
+            final Runnable chooserRunnable = new Runnable() {
+               @Override
+               public void run() {
+                  JFileChooser chooser = new JFileChooser();
+                  chooser.setDialogTitle(msg);
+
+                  if (dir) {
+                     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                  } else {
+                     chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                  }
+                  String openLocation = pathField.getText();
+                  if (openLocation == null || openLocation.length() == 0) {
+                     openLocation = OpenDialog.getDefaultDirectory();
+                  }
+                  if (openLocation != null) {
+                     File f = new File(openLocation);
+                     if (IJ.debugMode) {
+                        IJ.log("DirectoryChooser,setSelectedFile: " + f);
+                     }
+                     chooser.setSelectedFile(f);
+                  }
+                  chooser.setApproveButtonText("Select");
+                  if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                     File file = chooser.getSelectedFile();
+                     String result = file.getAbsolutePath();
+                     if (dir) {
+                        if (!result.endsWith(File.separator)) {
+                           result += File.separator;
+                        }
+                     }
+                     OpenDialog.setDefaultDirectory(result);
+                     pathField.setText(result);
+
+                  }
+               }
+            };
+
+            if (SwingUtilities.isEventDispatchThread()) {
+               chooserRunnable.run();
+            } else{
+               try {
+                  EventQueue.invokeAndWait(chooserRunnable);
+               } catch (InterruptedException ie) {
+               } catch (InvocationTargetException ex) {
+               }
             }
          }
       });
@@ -578,8 +628,7 @@ public class DiSpimFusion implements PlugIn {
       command.add(useInputMatrix ? "1" : "0");
       command.add("Balabalabala"); // path to transformation matrix
       command.add(prefs_.getBoolean(SAVEREGISTEREDIMAGES, false) ? "1" : "0");
-      //command.add(String.valueOf(prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
-      command.add("0.00001");
+      command.add(df_.format( prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
       command.add (String.valueOf(prefs_.getInt(DECONVOLUTIONITERATIONS, 10)));
       command.add(String.valueOf(prefs_.getInt(OUTPUTBITS, 16)));
       command.add(prefs_.get(PSFA, " "));
@@ -599,6 +648,7 @@ public class DiSpimFusion implements PlugIn {
       try {
          // actually start execution
          Process process = cmd.start(); 
+         ij.IJ.log("hello");
          
          // show output in IJ.log window
          BufferedReader reader = 

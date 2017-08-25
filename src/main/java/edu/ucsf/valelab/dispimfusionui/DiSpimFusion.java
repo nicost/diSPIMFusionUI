@@ -12,6 +12,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -46,8 +48,6 @@ public class DiSpimFusion implements PlugIn {
    // used as String inputs (TextFields)
    public static final String SPIMADIRECTORY = "Spim A Directory";
    public static final String SPIMBDIRECTORY = "Spim B Directory";
-   public static final String IMAGEANAME = "Image A Name";
-   public static final String IMAGEBNAME = "Image B Name";
    public static final String OUTPUTDIRECTORY = "Output Directory";
    public static final String PSFA = "PSFA";
    public static final String PSFB = "PSFB";
@@ -75,6 +75,9 @@ public class DiSpimFusion implements PlugIn {
    public static final String CUSTOMIZEMATRIX = "Customize initial transformation matrix";
    public static final String SAVEREGISTEREDIMAGES = "Save Registered Images";
    public static final String SHOWGPUINFO = "Show GPU Device Information";
+   // Used only as Preference keys
+   public static final String IMAGEANAME = "Image A Name";
+   public static final String IMAGEBNAME = "Image B Name";
    
    // miglayout options
    private final String paragraphSpacing_ = "wrap 15px";
@@ -95,7 +98,7 @@ public class DiSpimFusion implements PlugIn {
          "-90 deg (Y-axis)" };
    
    private final String[] textFields_ = {
-         SPIMADIRECTORY, SPIMBDIRECTORY, IMAGEANAME,  IMAGEBNAME, 
+         SPIMADIRECTORY, SPIMBDIRECTORY, 
          OUTPUTDIRECTORY, PSFA, PSFB };
    private final Map<String, JTextField> jTextFields_ = 
            new HashMap<String, JTextField>(textFields_.length);
@@ -121,6 +124,10 @@ public class DiSpimFusion implements PlugIn {
    
    private boolean recorderOn_ = false;
    private File cudaExe_ = null;
+   
+   private String imgAToken_ = "";
+   private String imgBToken_ = "";
+   
    
    public DiSpimFusion () {
       
@@ -204,6 +211,7 @@ public class DiSpimFusion implements PlugIn {
       addFDChoice(frame, optionsString, SPIMADIRECTORY, true);
       addFDChoice(frame, optionsString, SPIMBDIRECTORY, true);
       
+      /*
       frame.add(new Label(IMAGEANAME));
       JTextField tmp = jTextFields_.get(IMAGEANAME);
       tmp.setText(Macro.getValue(optionsString, IMAGEANAME.replaceAll("\\s",""), 
@@ -214,7 +222,7 @@ public class DiSpimFusion implements PlugIn {
       tmp2.setText(Macro.getValue(optionsString, IMAGEBNAME.replaceAll("\\s",""), 
               prefs_.get(IMAGEBNAME, "SPIMB_")));
       frame.add(tmp2, "w 120:120:120, wrap");
-      
+      */
       addFDChoice(frame, optionsString, OUTPUTDIRECTORY, true);
       
       frame.add(new Label(START));
@@ -337,18 +345,20 @@ public class DiSpimFusion implements PlugIn {
       okButton.addActionListener(new ActionListener() {
          @Override
          public void actionPerformed(ActionEvent e) {
-            storeSettings();
-            frame.setVisible(false);
-            frame.dispose();
+            if (checkSettings()) {
+               storeSettings();
+               frame.setVisible(false);
+               frame.dispose();
 
-            Runnable executor = new Runnable() {
-               @Override
-               public void run() {
-                  execute();
-               }
-            };
-            (new Thread(executor, "diSPIM CUDA execution")).start();
-            
+               Runnable executor = new Runnable() {
+                  @Override
+                  public void run() {
+                     execute();
+                  }
+               };
+               (new Thread(executor, "diSPIM CUDA execution")).start();
+
+            }
          }
       });
       frame.add(okButton, "span 4, split 4, tag ok");
@@ -408,6 +418,78 @@ public class DiSpimFusion implements PlugIn {
       frame.add(chooserButton(identifier, tmp, directory), "wrap");   
    }
  
+   /**
+    * Checks that all required settings are present
+    * Also deduces the Image A and B fields from the contents of the SPIM A and B
+    * directories.  
+    * Shows an ImageJ error message when something is not right
+    * @return true when all settings are fine, false if anything is not right.
+    */
+   private boolean checkSettings() {
+      final String[] files = {SPIMADIRECTORY, SPIMBDIRECTORY,  
+         OUTPUTDIRECTORY, PSFA, PSFB};
+      for (String file : files ) {
+         String value = ((JTextField) jTextFields_.get(file)).getText();
+         File f = new File(value);
+         if (!f.exists()) {
+            ij.IJ.showMessage("Can not read " + file);
+            return false;         
+         }
+      }
+      try {
+         imgAToken_ = getImagePrefix(((JTextField) jTextFields_.get(SPIMADIRECTORY)).getText());
+         prefs_.put(IMAGEANAME, imgAToken_);
+         imgBToken_ = getImagePrefix(((JTextField) jTextFields_.get(SPIMBDIRECTORY)).getText());
+         prefs_.put(IMAGEBNAME, imgBToken_);
+      } catch (FileNotFoundException fnfe) {
+         return false;
+      }
+      
+   
+      return true;
+   }
+   
+   /**
+    * Expects files in a directory to be named token_xx.tif
+    * Returns the part before the last underscore
+    * Checks that all tif files in a directory follow the same convention
+    * does not check for correct numbering
+    * If anything is incorrect, throws a FileNotFoundException after 
+    * displaying an IMageJ message
+    * @param dir directory to be examined
+    * @return token
+    * @throws FileNotFoundException 
+    */
+   private String getImagePrefix (final String dir) throws FileNotFoundException {
+      final File spimImageDir = new File(dir);
+      File[] listFiles = spimImageDir.listFiles(new FilenameFilter() {
+         @Override
+         public boolean accept(File dir, String name) {
+            return (name.endsWith(".tif") || (name.endsWith(".tiff"))) &&
+                   !name.startsWith(".") ;
+         }
+      });
+      if (listFiles == null || listFiles.length < 1) {
+         ij.IJ.showMessage("No Files found in " + dir );
+         throw new FileNotFoundException();
+      }
+      String firstName = listFiles[0].getName();
+      int indexOfLastUnderscore = firstName.lastIndexOf("_") + 1;
+      if (indexOfLastUnderscore < 1) {
+         ij.IJ.showMessage ("Tif files in " + dir + " are not named correctly");
+         throw new FileNotFoundException();
+      }
+      final String token = firstName.substring(0, indexOfLastUnderscore);
+      for (File lf : listFiles) {
+         if (!token.equals(lf.getName().substring(0, indexOfLastUnderscore))) {
+            ij.IJ.showMessage ("Not all tif files in " + dir + " start with " + token );
+            throw new FileNotFoundException();
+         }
+      }
+      
+      return token;
+   }
+   
    /**
     * Write settings to usernode preferences, and the ImageJ macro recorder
     */
@@ -496,7 +578,8 @@ public class DiSpimFusion implements PlugIn {
       command.add(useInputMatrix ? "1" : "0");
       command.add("Balabalabala"); // path to transformation matrix
       command.add(prefs_.getBoolean(SAVEREGISTEREDIMAGES, false) ? "1" : "0");
-      command.add(String.valueOf(prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
+      //command.add(String.valueOf(prefs_.getDouble(CONVERGENCETHRESHOLD, 0.0001)));
+      command.add("0.00001");
       command.add (String.valueOf(prefs_.getInt(DECONVOLUTIONITERATIONS, 10)));
       command.add(String.valueOf(prefs_.getInt(OUTPUTBITS, 16)));
       command.add(prefs_.get(PSFA, " "));
@@ -505,9 +588,9 @@ public class DiSpimFusion implements PlugIn {
       command.add(prefs_.getBoolean(SHOWGPUINFO, true) ? "1" : "0");
       command.add(String.valueOf(prefs_.getInt(GPUDEVICE, 0)));
       
-      //for (String token : command) {
-      //   ij.IJ.log(token);
-      //}
+      for (String token : command) {
+         ij.IJ.log(token);
+      }
       int nrArgs = command.size() - 1;
       ij.IJ.log ("There are: " + nrArgs + " arguments");
               

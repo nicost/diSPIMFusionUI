@@ -637,7 +637,7 @@ public class DiSpimFusion implements PlugIn {
       command.add(String.valueOf(prefs_.getDouble(YPIXELSIZEB, 0.165)));
       command.add(String.valueOf(prefs_.getDouble(ZPIXELSIZEB, 1.0)));
       command.add(String.valueOf(Arrays.asList(regOptionsStr_).indexOf(
-              prefs_.get(REGISTRATIONOPTIONS, "All images dependently"))));
+              prefs_.get(REGISTRATIONOPTIONS, "All images dependently")) + 1));
       int imbRotation = Arrays.asList(imageBRotationsStr_).indexOf(
               prefs_.get(IMAGEBROTATION, "No Rotation"));
       if (imbRotation == 2) { imbRotation = -1;}
@@ -672,7 +672,6 @@ public class DiSpimFusion implements PlugIn {
       try {
          // actually start execution
          Process process = cmd.start(); 
-         ij.IJ.log("hello");
          
          // show output in IJ.log window
          BufferedReader reader = 

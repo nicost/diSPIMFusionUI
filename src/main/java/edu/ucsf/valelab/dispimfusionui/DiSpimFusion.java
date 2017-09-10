@@ -12,6 +12,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -74,6 +75,7 @@ public class DiSpimFusion implements PlugIn {
    public static final String ZPIXELSIZEB = "ImageB z";
    public static final String CONVERGENCETHRESHOLD = "Convergence Threshold";
    // ComboBoxes
+   public static final String CUDAEXECUTABLE = "Cuda Executable";
    public static final String REGISTRATIONOPTIONS = "Registration Options";
    public static final String IMAGEBROTATION = "Image B Rotation"; 
    // CheckBoxes
@@ -92,6 +94,7 @@ public class DiSpimFusion implements PlugIn {
    private final Preferences prefs_;
    private final DecimalFormat df_;
 
+   private final JComboBox cudaExecutables_;
    private final JComboBox registrationOptions_;
    private final String[] regOptionsStr_ = {
          "All images dependently",
@@ -128,6 +131,8 @@ public class DiSpimFusion implements PlugIn {
       SAVEREGISTEREDIMAGES, SHOWGPUINFO };
    private final Map<String, JCheckBox> checkBoxes_ = 
            new HashMap<String, JCheckBox>(checkBoxLabels_.length);
+   
+   private final File cudaDir_;    
    
    private boolean recorderOn_ = false;
    private File cudaExe_ = null;
@@ -171,9 +176,12 @@ public class DiSpimFusion implements PlugIn {
          checkBoxes_.put(cb, new JCheckBox(cb));
       }
       
+      cudaExecutables_ = new JComboBox();
       registrationOptions_ = new JComboBox(regOptionsStr_);
       imageBRotation_ = new JComboBox(imageBRotationsStr_);
       
+      String imageJDir = IJ.getDirectory("imagej");
+      cudaDir_ = new File(imageJDir + File.separator + "CudaApp");
       
    }
            
@@ -186,16 +194,21 @@ public class DiSpimFusion implements PlugIn {
          return;
       }
       
-      String imageJDir = IJ.getDirectory("imagej");
-      File cudaDir = new File(imageJDir + File.separator + "CudaApp");
-      if (cudaDir.exists()) {
-         cudaExe_ = new File (cudaDir.getPath() + File.separator + 
-                 "spimfusion_singlecolor.exe");  
+      File[] cudaExes = null;
+      if (cudaDir_.exists()) {
+         cudaExes = cudaDir_.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathName) {
+               // TODO: provide platform specific tests
+               return pathName.canExecute() && pathName.getName().endsWith(".exe");
+            }
+         }); 
       }
-      if (cudaExe_ == null || !cudaExe_.canExecute()) {
+      if (cudaExes == null || cudaExes.length == 0) {
             IJ.showMessage("Please copy the CudaApp directory into the ImageJ directory");
             return;
       }
+      
 
       recorderOn_ = Recorder.record;
       
@@ -216,23 +229,20 @@ public class DiSpimFusion implements PlugIn {
       frame.setLayout( new MigLayout("",   // layout constraints
       "[right][][][]", // column constraints
       ""  // row constraints
-      ));
+      ));  
+            
+      frame.add(new Label("Cuda executable"));
+      for (File cudaExe : cudaExes) {
+         cudaExecutables_.addItem(cudaExe.getName());
+      }
+      cudaExecutables_.setSelectedItem(Macro.getValue(optionsString, 
+              CUDAEXECUTABLE.replaceAll("\\s", ""),
+              prefs_.get(CUDAEXECUTABLE, cudaExes[0].getName())));
+      frame.add(cudaExecutables_, "wrap");
+    
       
       addFDChoice(frame, optionsString, SPIMADIRECTORY, true);
       addFDChoice(frame, optionsString, SPIMBDIRECTORY, true);
-      
-      /*
-      frame.add(new Label(IMAGEANAME));
-      JTextField tmp = jTextFields_.get(IMAGEANAME);
-      tmp.setText(Macro.getValue(optionsString, IMAGEANAME.replaceAll("\\s",""), 
-              prefs_.get(IMAGEANAME, "SPIMA_")));
-      frame.add(tmp, "w 120:120:120");
-      frame.add(new Label(IMAGEBNAME), "gapleft push");
-      JTextField tmp2 = jTextFields_.get(IMAGEBNAME);
-      tmp2.setText(Macro.getValue(optionsString, IMAGEBNAME.replaceAll("\\s",""), 
-              prefs_.get(IMAGEBNAME, "SPIMB_")));
-      frame.add(tmp2, "w 120:120:120, wrap");
-      */
       addFDChoice(frame, optionsString, OUTPUTDIRECTORY, true);
       
       frame.add(new Label(START));
@@ -476,6 +486,13 @@ public class DiSpimFusion implements PlugIn {
     * @return true when all settings are fine, false if anything is not right.
     */
    private boolean checkSettings() {
+      
+      cudaExe_ = new File (cudaDir_.getPath() + File.separator + 
+              (String) cudaExecutables_.getSelectedItem());
+      if (cudaExe_ == null || !cudaExe_.canExecute()) {
+         ij.IJ.showMessage("Can not find or execute " + cudaExe_.getName());
+         return false;
+      }
       final String[] files = {SPIMADIRECTORY, SPIMBDIRECTORY,  
          OUTPUTDIRECTORY, PSFA, PSFB};
       for (String file : files ) {
@@ -505,7 +522,7 @@ public class DiSpimFusion implements PlugIn {
     * Checks that all tif files in a directory follow the same convention
     * does not check for correct numbering
     * If anything is incorrect, throws a FileNotFoundException after 
-    * displaying an IMageJ message
+    * displaying an ImageJ message
     * @param dir directory to be examined
     * @return token
     * @throws FileNotFoundException 
@@ -546,6 +563,13 @@ public class DiSpimFusion implements PlugIn {
    private void storeSettings () {
       if (recorderOn_) {
          Recorder.setCommand("diSPIM Fusion");
+      }
+      
+      prefs_.put(CUDAEXECUTABLE, cudaExe_.getName());
+      if (recorderOn_) {
+         String key = CUDAEXECUTABLE.replaceAll("\\s", "");
+         String value = cudaExe_.getName().replace("\\", "\\\\");
+         Recorder.recordOption(key, value);
       }
             
       for (final String tf : textFields_) {

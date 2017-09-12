@@ -571,6 +571,20 @@ public class DiSpimFusion implements PlugIn {
          String value = cudaExe_.getName().replace("\\", "\\\\");
          Recorder.recordOption(key, value);
       }
+      
+      prefs_.put(REGISTRATIONOPTIONS, (String) registrationOptions_.getSelectedItem());
+      if (recorderOn_) {
+         String key = REGISTRATIONOPTIONS.replaceAll("\\s", "");
+         String value = ((String) registrationOptions_.getSelectedItem()).replace("\\", "\\\\");
+         Recorder.recordOption(key, value);
+      }
+      
+      prefs_.put(IMAGEBROTATION, (String) imageBRotation_.getSelectedItem());
+      if (recorderOn_) {
+         String key = IMAGEBROTATION.replaceAll("\\s", "");
+         String value = ((String) registrationOptions_.getSelectedItem()).replace("\\", "\\\\");
+         Recorder.recordOption(key, value);
+      }
             
       for (final String tf : textFields_) {
          String value = ((JTextField) jTextFields_.get(tf)).getText();
